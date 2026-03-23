@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AstraCare Bluetooth</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body{background:#0f172a; color:#f8fafc; font-family:'Segoe UI',sans-serif; text-align:center; padding:20px;}
+        .card{background:#1e293b; border-radius:16px; padding:20px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3);}
+        .stat-val{font-size:24px; font-weight:bold; color:#38bdf8;}
+        .btn{display:block; width:100%; padding:14px; border:none; border-radius:10px; cursor:pointer; font-weight:600; margin-top:10px; text-decoration:none; color:white;}
+        .btn-blue{background:#3b82f6;} .btn-green{background:#22c55e;}
+        .row{background:#334155; padding:10px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between;}
+    </style>
+</head>
+<body>
+    <div style="max-width:500px; margin:auto;">
+        <h1>🫁 AstraCare (BLE)</h1>
+        
+        <button id="connectBtn" class="btn btn-blue">Connect to Inhaler</button>
+        <p id="status" style="color:#94a3b8;">Status: Disconnected</p>
+
+        <div class="card">
+            <h3>Inventory</h3>
+            <div id="doseCount" class="stat-val">--- / 200</div>
+            <p id="extraCount">Extra Puffs: --</p>
+        </div>
+
+        <div class="card">
+            <h3>Monthly Analysis</h3>
+            <canvas id="monthChart" height="200"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>Schedule</h3>
+            <div id="scheduleList"></div>
+            <input type="time" id="newTime" style="margin-top:10px; padding:5px;">
+            <button class="btn btn-green" onclick="addDose()">Add Dose</button>
+        </div>
+    </div>
+
+    <script>
+        let device, scheduleChar, historyChar;
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const SCHED_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        const HIST_UUID = "8221162b-658b-4977-94d7-0101b4c9e46a";
+
+        document.getElementById('connectBtn').onclick = async () => {
+            try {
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{name: 'AstraCare-Inhaler'}],
+                    optionalServices: [SERVICE_UUID]
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                scheduleChar = await service.getCharacteristic(SCHED_UUID);
+                historyChar = await service.getCharacteristic(HIST_UUID);
+
+                document.getElementById('status').innerText = "Status: Connected";
+                startNotifications();
+            } catch(e) { console.log(e); }
+        };
+
+        async function startNotifications() {
+            await historyChar.startNotifications();
+            historyChar.addEventListener('characteristicvaluechanged', (e) => {
+                const raw = new TextDecoder().decode(e.target.value);
+                const parts = raw.split('|');
+                document.getElementById('doseCount').innerText = (200 - parts[0]) + " / 200";
+                document.getElementById('extraCount').innerText = "Extra Puffs: " + parts[1];
+                updateChart(parts[2].split(',').map(Number));
+            });
+        }
+
+        function updateChart(data) {
+            // Chart.js update logic here (similar to your previous graph)
+        }
+
+        async function addDose() {
+            const time = document.getElementById('newTime').value;
+            const [h, m] = time.split(':').map(Number);
+            const totalMin = h * 60 + m;
+            // Send new schedule to ESP32
+            await scheduleChar.writeValue(new TextEncoder().encode(totalMin.toString()));
+        }
+    </script>
+</body>
+</html>
