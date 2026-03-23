@@ -1,89 +1,252 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AstraCare Bluetooth</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstraCare Pro | BLE Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body{background:#0f172a; color:#f8fafc; font-family:'Segoe UI',sans-serif; text-align:center; padding:20px;}
-        .card{background:#1e293b; border-radius:16px; padding:20px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3);}
-        .stat-val{font-size:24px; font-weight:bold; color:#38bdf8;}
-        .btn{display:block; width:100%; padding:14px; border:none; border-radius:10px; cursor:pointer; font-weight:600; margin-top:10px; text-decoration:none; color:white;}
-        .btn-blue{background:#3b82f6;} .btn-green{background:#22c55e;}
-        .row{background:#334155; padding:10px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between;}
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 { text-align: center; color: var(--accent); margin-bottom: 30px; }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        #status-dot {
+            height: 12px;
+            width: 12px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: #334155;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-val { font-size: 24px; font-weight: bold; color: var(--accent); }
+        .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:active { transform: scale(0.98); }
+        .btn-blue { background: #3b82f6; color: white; }
+        .btn-green { background: var(--success); color: white; }
+        .btn-outline { background: transparent; border: 2px solid #334155; color: var(--text-dim); }
+
+        input[type="time"] {
+            background: #334155;
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 18px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        #history-section { display: none; }
     </style>
 </head>
 <body>
-    <div style="max-width:500px; margin:auto;">
-        <h1>🫁 AstraCare (BLE)</h1>
-        
-        <button id="connectBtn" class="btn btn-blue">Connect to Inhaler</button>
-        <p id="status" style="color:#94a3b8;">Status: Disconnected</p>
 
+<div class="container">
+    <h1>🫁 AstraCare Pro</h1>
+
+    <div class="card">
+        <div class="status-bar">
+            <span><span id="status-dot"></span> <span id="status-text">Disconnected</span></span>
+            <button id="connectBtn" class="btn btn-blue" style="width: auto; margin: 0; padding: 8px 16px;">Connect</button>
+        </div>
+    </div>
+
+    <div id="history-section">
         <div class="card">
-            <h3>Inventory</h3>
-            <div id="doseCount" class="stat-val">--- / 200</div>
-            <p id="extraCount">Extra Puffs: --</p>
+            <div class="stat-label">Remaining Doses</div>
+            <div id="inv-val" class="stat-val" style="font-size: 48px; margin: 10px 0;">--- / 200</div>
+            <div id="mcg-val" style="color: var(--text-dim);">--- mcg available</div>
         </div>
 
         <div class="card">
             <h3>Monthly Analysis</h3>
-            <canvas id="monthChart" height="200"></canvas>
+            <canvas id="monthChart"></canvas>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Weekly Avg</div>
+                    <div id="week-avg" class="stat-val">--</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Extra Puffs</div>
+                    <div id="extra-val" class="stat-val">--</div>
+                </div>
+            </div>
         </div>
 
         <div class="card">
-            <h3>Schedule</h3>
-            <div id="scheduleList"></div>
-            <input type="time" id="newTime" style="margin-top:10px; padding:5px;">
-            <button class="btn btn-green" onclick="addDose()">Add Dose</button>
+            <h3>Add New Timer</h3>
+            <input type="time" id="timeInput">
+            <button onclick="sendNewDose()" class="btn btn-green">Update Schedule</button>
+            <button onclick="resetDevice()" class="btn btn-outline" style="margin-top: 20px; color: var(--danger);">Reset All Records</button>
         </div>
     </div>
+</div>
 
-    <script>
-        let device, scheduleChar, historyChar;
-        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const SCHED_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        const HIST_UUID = "8221162b-658b-4977-94d7-0101b4c9e46a";
+<script>
+    let device, scheduleChar, historyChar, chart;
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const SCHED_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const HIST_UUID = "8221162b-658b-4977-94d7-0101b4c9e46a";
 
-        document.getElementById('connectBtn').onclick = async () => {
-            try {
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{name: 'AstraCare-Inhaler'}],
-                    optionalServices: [SERVICE_UUID]
-                });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                scheduleChar = await service.getCharacteristic(SCHED_UUID);
-                historyChar = await service.getCharacteristic(HIST_UUID);
+    const connectBtn = document.getElementById('connectBtn');
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-dot');
+    const historySection = document.getElementById('history-section');
 
-                document.getElementById('status').innerText = "Status: Connected";
-                startNotifications();
-            } catch(e) { console.log(e); }
-        };
-
-        async function startNotifications() {
-            await historyChar.startNotifications();
-            historyChar.addEventListener('characteristicvaluechanged', (e) => {
-                const raw = new TextDecoder().decode(e.target.value);
-                const parts = raw.split('|');
-                document.getElementById('doseCount').innerText = (200 - parts[0]) + " / 200";
-                document.getElementById('extraCount').innerText = "Extra Puffs: " + parts[1];
-                updateChart(parts[2].split(',').map(Number));
+    connectBtn.addEventListener('click', async () => {
+        try {
+            statusText.innerText = "Searching...";
+            device = await navigator.bluetooth.requestDevice({
+                filters: [{ name: 'AstraCare-Inhaler' }],
+                optionalServices: [SERVICE_UUID]
             });
-        }
 
-        function updateChart(data) {
-            // Chart.js update logic here (similar to your previous graph)
-        }
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            scheduleChar = await service.getCharacteristic(SCHED_UUID);
+            historyChar = await service.getCharacteristic(HIST_UUID);
 
-        async function addDose() {
-            const time = document.getElementById('newTime').value;
-            const [h, m] = time.split(':').map(Number);
-            const totalMin = h * 60 + m;
-            // Send new schedule to ESP32
-            await scheduleChar.writeValue(new TextEncoder().encode(totalMin.toString()));
+            statusText.innerText = "Connected";
+            statusDot.style.backgroundColor = "var(--success)";
+            connectBtn.style.display = "none";
+            historySection.style.display = "block";
+
+            await historyChar.startNotifications();
+            historyChar.addEventListener('characteristicvaluechanged', handleData);
+        } catch (error) {
+            console.log(error);
+            statusText.innerText = "Error Connecting";
         }
-    </script>
+    });
+
+    function handleData(event) {
+        const raw = new TextDecoder().decode(event.target.value);
+        const [used, extra, historyStr] = raw.split('|');
+        const historyArray = historyStr.split(',').map(Number);
+
+        // Update Inventory
+        const remaining = 200 - parseInt(used);
+        document.getElementById('inv-val').innerText = `${remaining} / 200`;
+        document.getElementById('mcg-val').innerText = `${remaining * 100} mcg available`;
+        document.getElementById('extra-val').innerText = extra;
+
+        // Update Weekly Avg (Last 7 days)
+        const weeklySum = historyArray.slice(0, 7).reduce((a, b) => a + b, 0);
+        document.getElementById('week-avg').innerText = Math.round(weeklySum / 7) + " mcg";
+
+        updateChart(historyArray);
+    }
+
+    function updateChart(data) {
+        const ctx = document.getElementById('monthChart').getContext('2d');
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({ length: 30 }, (_, i) => 30 - i),
+                datasets: [{
+                    label: 'mcg consumed',
+                    data: data.reverse(),
+                    borderColor: '#38bdf8',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { beginAtZero: true, grid: { color: '#334155' } },
+                    x: { ticks: { display: false }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    async function sendNewDose() {
+        const timeVal = document.getElementById('timeInput').value;
+        if (!timeVal) return alert("Select a time first");
+
+        const [h, m] = timeVal.split(':').map(Number);
+        const totalMinutes = (h * 60 + m).toString();
+
+        await scheduleChar.writeValue(new TextEncoder().encode(totalMinutes));
+        alert("Timer Synced to Inhaler!");
+    }
+
+    async function resetDevice() {
+        // Send a specific flag (like "9999") to trigger the reset function in your ESP32 code
+        await scheduleChar.writeValue(new TextEncoder().encode("9999"));
+        location.reload();
+    }
+</script>
+
 </body>
 </html>
