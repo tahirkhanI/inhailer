@@ -17,7 +17,6 @@
         .btn-blue { background: #3b82f6; } .btn-green { background: var(--success); } .btn-outline { background: transparent; border: 2px solid #334155; color: var(--danger); }
         input[type="time"] { background: #334155; border: none; color: white; padding: 12px; border-radius: 8px; font-size: 18px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
         .schedule-row { background: #334155; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .alert-box { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); padding: 15px; border-radius: 12px; margin-top: 15px; text-align: center; }
         #dashboard-ui { display: none; }
     </style>
 </head>
@@ -30,14 +29,10 @@
     </div>
 
     <div id="dashboard-ui">
-        <div class="card">
-            <div class="stat-label">Device Inventory</div>
-            <div id="inv-val" class="stat-val" style="font-size: 42px; margin: 10px 0;">--- / 200</div>
-            
-            <div id="alert-section" class="alert-box" style="display:none;">
-                <span style="color:var(--danger); font-weight:bold;">⚠️ Unplanned Puffs: </span>
-                <span id="extra-val" style="color:white; font-size:20px;">0</span>
-            </div>
+        <div class="card" style="text-align: center;">
+            <div class="stat-label">Inhaler Clock</div>
+            <div id="clock-val" class="stat-val" style="color:var(--success); font-size: 32px;">--:--</div>
+            <button onclick="syncTime()" class="btn btn-outline" style="padding: 5px; font-size: 12px; border-color:var(--accent); color:var(--accent);">Sync Phone Time</button>
         </div>
 
         <div class="card">
@@ -53,8 +48,8 @@
         </div>
 
         <div class="card">
-            <h3>30-Day Adherence (mcg)</h3>
             <canvas id="monthChart"></canvas>
+            <div id="inv-val" class="stat-val" style="margin-top: 20px; text-align: center;">--- / 200 Puffs Left</div>
         </div>
     </div>
 </div>
@@ -76,6 +71,9 @@
             document.getElementById('conn-card').style.display = "none";
             document.getElementById('dashboard-ui').style.display = "block";
 
+            // AUTO SYNC ON CONNECT
+            setTimeout(syncTime, 1000);
+
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', (event) => {
                 const decoder = new TextDecoder('utf-8');
@@ -85,36 +83,35 @@
         } catch (e) { console.error(e); }
     });
 
-    function updateDashboard(data) {
-        // Inventory
-        document.getElementById('inv-val').innerText = `${200 - data.u} / 200`;
-        
-        // Show Unplanned Puffs if greater than 0
-        if(data.e > 0) {
-            document.getElementById('alert-section').style.display = "block";
-            document.getElementById('extra-val').innerText = data.e;
-        } else {
-            document.getElementById('alert-section').style.display = "none";
-        }
+    async function syncTime() {
+        const now = new Date();
+        const totalMin = now.getHours() * 60 + now.getMinutes();
+        await commandChar.writeValue(new TextEncoder().encode("TIME:" + totalMin));
+        console.log("Time Synced: " + totalMin);
+    }
 
-        // Schedule
+    function updateDashboard(data) {
+        // Update Inventory
+        document.getElementById('inv-val').innerText = `${200 - data.u} / 200 Puffs Left`;
+        
+        // Update Clock Display
+        let ch = Math.floor(data.t / 60);
+        let cm = data.t % 60;
+        document.getElementById('clock-val').innerText = (ch<10?'0':'') + ch + ":" + (cm<10?'0':'') + cm;
+
+        // Update Schedule
         const list = document.getElementById('schedule-list');
         list.innerHTML = "";
         data.s.forEach((min, index) => {
-            let h = Math.floor(min / 60);
-            let m = min % 60;
+            let h = Math.floor(min / 60); let m = min % 60;
             let timeStr = (h<10?'0':'') + h + ":" + (m<10?'0':'') + m;
-            list.innerHTML += `<div class="schedule-row"><span>${timeStr}</span><span onclick="delDose(${index})" style="color:var(--danger); cursor:pointer; font-weight:bold;">Remove</span></div>`;
+            list.innerHTML += `<div class="schedule-row"><span>${timeStr}</span><span onclick="delDose(${index})" style="color:var(--danger); cursor:pointer;">Remove</span></div>`;
         });
-        if(data.s.length === 0) list.innerHTML = "<p style='color:var(--text-dim)'>No timers active.</p>";
-
         updateChart(data.h);
     }
 
     async function delDose(index) {
-        if(confirm("Remove this dose time?")) {
-            await commandChar.writeValue(new TextEncoder().encode("DEL:" + index));
-        }
+        if(confirm("Remove this timer?")) await commandChar.writeValue(new TextEncoder().encode("DEL:" + index));
     }
 
     function updateChart(historyArray) {
@@ -124,20 +121,19 @@
             type: 'line',
             data: {
                 labels: Array.from({ length: 30 }, (_, i) => 30 - i),
-                datasets: [{ label: 'mcg', data: historyArray.reverse(), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', fill: true, tension: 0.4 }]
+                datasets: [{ label: 'mcg', data: historyArray.reverse(), borderColor: '#38bdf8', tension: 0.4 }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid:{color:'#334155'} } } }
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
     }
 
     document.getElementById('saveTimerBtn').addEventListener('click', async () => {
         const [h, m] = document.getElementById('timeInput').value.split(':').map(Number);
         await commandChar.writeValue(new TextEncoder().encode((h * 60 + m).toString()));
-        alert("Schedule Updated!");
     });
 
     document.getElementById('resetBtn').addEventListener('click', async () => {
-        if(confirm("Reset all medical history and inventory?")) await commandChar.writeValue(new TextEncoder().encode("9999"));
+        if(confirm("Master Reset?")) await commandChar.writeValue(new TextEncoder().encode("9999"));
     });
 </script>
 </body>
