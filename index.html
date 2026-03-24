@@ -6,50 +6,140 @@
     <title>AstraCare Pro | BLE Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --success: #22c55e; --danger: #ef4444; --text: #f8fafc; --text-dim: #94a3b8; }
-        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        :root { 
+            --bg: #0f172a; 
+            --card: #1e293b; 
+            --accent: #38bdf8; 
+            --success: #22c55e; 
+            --danger: #ef4444; 
+            --text: #f8fafc; 
+            --text-dim: #94a3b8; 
+        }
+
+        body { 
+            background-color: var(--bg); 
+            color: var(--text); 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            justify-content: center; 
+        }
+
         .container { width: 100%; max-width: 500px; }
-        h1 { text-align: center; color: var(--accent); margin-bottom: 30px; }
-        .card { background: var(--card); border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-        .stat-val { font-size: 24px; font-weight: bold; color: var(--accent); }
-        .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; color: white; margin-top: 10px; }
-        .btn-blue { background: #3b82f6; } .btn-green { background: var(--success); } .btn-outline { background: transparent; border: 2px solid #334155; color: var(--danger); }
-        input[type="time"] { background: #334155; border: none; color: white; padding: 12px; border-radius: 8px; font-size: 18px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
-        .schedule-row { background: #334155; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        h1 { text-align: center; color: var(--accent); margin-bottom: 30px; letter-spacing: 1px; }
+
+        .card { 
+            background: var(--card); 
+            border-radius: 20px; 
+            padding: 24px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); 
+        }
+
+        .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+        .stat-val { font-size: 28px; font-weight: bold; color: var(--accent); }
+
+        .btn { 
+            width: 100%; 
+            padding: 14px; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            color: white; 
+            margin-top: 10px; 
+            transition: all 0.2s;
+        }
+
+        .btn-blue { background: #3b82f6; }
+        .btn-green { background: var(--success); }
+        .btn-outline { background: transparent; border: 2px solid #334155; color: var(--text-dim); }
+        .btn-sync { background: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent); color: var(--accent); font-size: 12px; padding: 6px; width: auto; margin: 10px auto; display: inline-block;}
+
+        input[type="time"] { 
+            background: #334155; 
+            border: none; 
+            color: white; 
+            padding: 14px; 
+            border-radius: 10px; 
+            font-size: 20px; 
+            width: 100%; 
+            box-sizing: border-box; 
+            margin-bottom: 12px;
+            outline: none;
+        }
+
+        .schedule-row { 
+            background: #334155; 
+            padding: 14px; 
+            border-radius: 12px; 
+            margin-bottom: 10px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+
+        .alert-box { 
+            background: rgba(239, 68, 68, 0.15); 
+            border: 1px solid var(--danger); 
+            padding: 16px; 
+            border-radius: 15px; 
+            margin-top: 15px; 
+            text-align: center;
+            display: none;
+        }
+
         #dashboard-ui { display: none; }
+        .flex-center { display: flex; flex-direction: column; align-items: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🫁 AstraCare Pro</h1>
-    <div class="card" id="conn-card">
+
+    <div class="card" id="conn-card" style="text-align: center;">
+        <p style="color: var(--text-dim);">Connect to your inhaler via Bluetooth to sync data.</p>
         <button id="connectBtn" class="btn btn-blue">Connect Bluetooth</button>
     </div>
 
     <div id="dashboard-ui">
-        <div class="card" style="text-align: center;">
-            <div class="stat-label">Inhaler Clock</div>
-            <div id="clock-val" class="stat-val" style="color:var(--success); font-size: 32px;">--:--</div>
-            <button onclick="syncTime()" class="btn btn-outline" style="padding: 5px; font-size: 12px; border-color:var(--accent); color:var(--accent);">Sync Phone Time</button>
+        
+        <div class="card flex-center">
+            <div class="stat-label">Inhaler System Time</div>
+            <div id="clock-val" class="stat-val" style="color:var(--success); font-size: 42px; margin: 5px 0;">--:--</div>
+            <button onclick="syncTime()" class="btn-sync">↻ Re-Sync Phone Time</button>
         </div>
 
         <div class="card">
-            <h3>Saved Timings</h3>
-            <div id="schedule-list"></div>
+            <div class="stat-label">Remaining Doses</div>
+            <div id="inv-val" class="stat-val" style="font-size: 36px; margin: 10px 0;">--- / 200</div>
+            
+            <div id="alert-section" class="alert-box">
+                <span style="color:var(--danger); font-weight:bold; font-size: 14px;">⚠️ UNPLANNED PUFFS DETECTED: </span>
+                <span id="extra-val" style="color:white; font-size:22px; font-weight: 800;">0</span>
+            </div>
         </div>
 
         <div class="card">
-            <h3>Add Dose Timer</h3>
+            <h3 style="margin-top: 0;">Daily Schedule</h3>
+            <div id="schedule-list">
+                <p style="color: var(--text-dim);">No active timers.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0;">Set New Reminder</h3>
             <input type="time" id="timeInput" value="08:00">
-            <button id="saveTimerBtn" class="btn btn-green">Sync to Inhaler</button>
-            <button id="resetBtn" class="btn btn-outline" style="margin-top: 20px;">⚠️ Master Reset</button>
+            <button id="saveTimerBtn" class="btn btn-green">Add to Inhaler</button>
+            <button id="resetBtn" class="btn btn-outline" style="margin-top: 25px; color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">⚠️ Clear Medical History</button>
         </div>
 
         <div class="card">
+            <h3 style="margin-top: 0;">30-Day Adherence (mcg)</h3>
             <canvas id="monthChart"></canvas>
-            <div id="inv-val" class="stat-val" style="margin-top: 20px; text-align: center;">--- / 200 Puffs Left</div>
         </div>
     </div>
 </div>
@@ -60,9 +150,14 @@
     const COMMAND_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
     const DATA_UUID    = "8221162b-658b-4977-94d7-0101b4c9e46a";
 
+    // --- BLUETOOTH CONNECTION ---
     document.getElementById('connectBtn').addEventListener('click', async () => {
         try {
-            const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'AstraCare' }], optionalServices: [SERVICE_UUID] });
+            const device = await navigator.bluetooth.requestDevice({ 
+                filters: [{ name: 'AstraCare' }], 
+                optionalServices: [SERVICE_UUID] 
+            });
+
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService(SERVICE_UUID);
             commandChar = await service.getCharacteristic(COMMAND_UUID);
@@ -71,7 +166,7 @@
             document.getElementById('conn-card').style.display = "none";
             document.getElementById('dashboard-ui').style.display = "block";
 
-            // AUTO SYNC ON CONNECT
+            // Automatically sync time from phone on connection
             setTimeout(syncTime, 1000);
 
             await dataChar.startNotifications();
@@ -80,40 +175,84 @@
                 const data = JSON.parse(decoder.decode(event.target.value));
                 updateDashboard(data);
             });
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error(e); 
+            alert("Bluetooth connection failed. Make sure your Inhaler is ON.");
+        }
     });
 
+    // --- TIME SYNC LOGIC ---
     async function syncTime() {
         const now = new Date();
         const totalMin = now.getHours() * 60 + now.getMinutes();
         await commandChar.writeValue(new TextEncoder().encode("TIME:" + totalMin));
-        console.log("Time Synced: " + totalMin);
     }
 
+    // --- DASHBOARD UPDATER ---
     function updateDashboard(data) {
-        // Update Inventory
-        document.getElementById('inv-val').innerText = `${200 - data.u} / 200 Puffs Left`;
+        // 1. Inventory
+        document.getElementById('inv-val').innerText = `${200 - data.u} / 200`;
         
-        // Update Clock Display
+        // 2. Unplanned Puff Alert (Brought Back!)
+        if(data.e > 0) {
+            document.getElementById('alert-section').style.display = "block";
+            document.getElementById('extra-val').innerText = data.e;
+        } else {
+            document.getElementById('alert-section').style.display = "none";
+        }
+
+        // 3. System Clock
         let ch = Math.floor(data.t / 60);
         let cm = data.t % 60;
         document.getElementById('clock-val').innerText = (ch<10?'0':'') + ch + ":" + (cm<10?'0':'') + cm;
 
-        // Update Schedule
+        // 4. Saved Schedule List
         const list = document.getElementById('schedule-list');
         list.innerHTML = "";
-        data.s.forEach((min, index) => {
-            let h = Math.floor(min / 60); let m = min % 60;
-            let timeStr = (h<10?'0':'') + h + ":" + (m<10?'0':'') + m;
-            list.innerHTML += `<div class="schedule-row"><span>${timeStr}</span><span onclick="delDose(${index})" style="color:var(--danger); cursor:pointer;">Remove</span></div>`;
-        });
+        if(data.s.length === 0) {
+            list.innerHTML = "<p style='color: var(--text-dim);'>No active timers.</p>";
+        } else {
+            data.s.forEach((min, index) => {
+                let h = Math.floor(min / 60);
+                let m = min % 60;
+                let timeStr = (h<10?'0':'') + h + ":" + (m<10?'0':'') + m;
+                list.innerHTML += `
+                    <div class="schedule-row">
+                        <span style="font-weight: bold; font-size: 18px;">${timeStr}</span>
+                        <button onclick="delDose(${index})" style="background:none; border:none; color:var(--danger); font-weight:bold; cursor:pointer;">REMOVE</button>
+                    </div>`;
+            });
+        }
+
         updateChart(data.h);
     }
 
+    // --- COMMANDS ---
     async function delDose(index) {
-        if(confirm("Remove this timer?")) await commandChar.writeValue(new TextEncoder().encode("DEL:" + index));
+        if(confirm("Remove this dose reminder?")) {
+            await commandChar.writeValue(new TextEncoder().encode("DEL:" + index));
+        }
     }
 
+    document.getElementById('saveTimerBtn').addEventListener('click', async () => {
+        const timeInput = document.getElementById('timeInput').value;
+        if (!timeInput) return alert("Select a time first");
+        
+        const [h, m] = timeInput.split(':').map(Number);
+        const totalMin = (h * 60 + m).toString();
+        
+        await commandChar.writeValue(new TextEncoder().encode(totalMin));
+        alert("Schedule Updated!");
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', async () => {
+        if(confirm("DANGER: This will delete all medical records and reset inventory. Proceed?")) {
+            await commandChar.writeValue(new TextEncoder().encode("9999"));
+            location.reload();
+        }
+    });
+
+    // --- CHARTING ---
     function updateChart(historyArray) {
         const ctx = document.getElementById('monthChart').getContext('2d');
         if (chart) chart.destroy();
@@ -121,20 +260,26 @@
             type: 'line',
             data: {
                 labels: Array.from({ length: 30 }, (_, i) => 30 - i),
-                datasets: [{ label: 'mcg', data: historyArray.reverse(), borderColor: '#38bdf8', tension: 0.4 }]
+                datasets: [{ 
+                    label: 'mcg consumed', 
+                    data: historyArray.reverse(), 
+                    borderColor: '#38bdf8', 
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)', 
+                    fill: true, 
+                    tension: 0.4,
+                    pointRadius: 2
+                }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            options: { 
+                plugins: { legend: { display: false } }, 
+                scales: { 
+                    y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                    x: { ticks: { display: false }, grid: { display: false } }
+                } 
+            }
         });
     }
-
-    document.getElementById('saveTimerBtn').addEventListener('click', async () => {
-        const [h, m] = document.getElementById('timeInput').value.split(':').map(Number);
-        await commandChar.writeValue(new TextEncoder().encode((h * 60 + m).toString()));
-    });
-
-    document.getElementById('resetBtn').addEventListener('click', async () => {
-        if(confirm("Master Reset?")) await commandChar.writeValue(new TextEncoder().encode("9999"));
-    });
 </script>
+
 </body>
 </html>
