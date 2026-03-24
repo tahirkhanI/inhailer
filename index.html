@@ -11,15 +11,13 @@
         .container { width: 100%; max-width: 500px; }
         h1 { text-align: center; color: var(--accent); margin-bottom: 30px; }
         .card { background: var(--card); border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-        .status-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        #status-dot { height: 12px; width: 12px; background-color: var(--danger); border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-        .stat-box { background: #334155; padding: 15px; border-radius: 12px; text-align: center; }
         .stat-val { font-size: 24px; font-weight: bold; color: var(--accent); }
         .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
         .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; color: white; margin-top: 10px; }
         .btn-blue { background: #3b82f6; } .btn-green { background: var(--success); } .btn-outline { background: transparent; border: 2px solid #334155; color: var(--danger); }
-        input[type="time"] { background: #334155; border: none; color: white; padding: 10px; border-radius: 8px; font-size: 18px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+        input[type="time"] { background: #334155; border: none; color: white; padding: 12px; border-radius: 8px; font-size: 18px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+        .schedule-row { background: #334155; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .alert-box { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); padding: 15px; border-radius: 12px; margin-top: 15px; text-align: center; }
         #dashboard-ui { display: none; }
     </style>
 </head>
@@ -27,35 +25,36 @@
 
 <div class="container">
     <h1>🫁 AstraCare Pro</h1>
-
-    <div class="card">
-        <div class="status-bar">
-            <span><span id="status-dot"></span> <span id="status-text">Disconnected</span></span>
-            <button id="connectBtn" class="btn btn-blue" style="width: auto; margin: 0; padding: 8px 16px;">Connect Bluetooth</button>
-        </div>
+    <div class="card" id="conn-card">
+        <button id="connectBtn" class="btn btn-blue">Connect Bluetooth</button>
     </div>
 
     <div id="dashboard-ui">
         <div class="card">
-            <div class="stat-label">Remaining Doses</div>
-            <div id="inv-val" class="stat-val" style="font-size: 48px; margin: 10px 0;">--- / 200</div>
-            <div id="mcg-val" style="color: var(--text-dim);">--- mcg available</div>
-        </div>
-
-        <div class="card">
-            <h3>30-Day Analysis</h3>
-            <canvas id="monthChart"></canvas>
-            <div class="stat-grid">
-                <div class="stat-box"><div class="stat-label">Weekly Avg</div><div id="week-avg" class="stat-val">--</div></div>
-                <div class="stat-box"><div class="stat-label">Extra Puffs</div><div id="extra-val" class="stat-val">--</div></div>
+            <div class="stat-label">Device Inventory</div>
+            <div id="inv-val" class="stat-val" style="font-size: 42px; margin: 10px 0;">--- / 200</div>
+            
+            <div id="alert-section" class="alert-box" style="display:none;">
+                <span style="color:var(--danger); font-weight:bold;">⚠️ Unplanned Puffs: </span>
+                <span id="extra-val" style="color:white; font-size:20px;">0</span>
             </div>
         </div>
 
         <div class="card">
+            <h3>Saved Timings</h3>
+            <div id="schedule-list"></div>
+        </div>
+
+        <div class="card">
             <h3>Add Dose Timer</h3>
-            <input type="time" id="timeInput">
+            <input type="time" id="timeInput" value="08:00">
             <button id="saveTimerBtn" class="btn btn-green">Sync to Inhaler</button>
             <button id="resetBtn" class="btn btn-outline" style="margin-top: 20px;">⚠️ Master Reset</button>
+        </div>
+
+        <div class="card">
+            <h3>30-Day Adherence (mcg)</h3>
+            <canvas id="monthChart"></canvas>
         </div>
     </div>
 </div>
@@ -68,63 +67,56 @@
 
     document.getElementById('connectBtn').addEventListener('click', async () => {
         try {
-            document.getElementById('status-text').innerText = "Scanning...";
-            
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ name: 'AstraCare' }],
-                optionalServices: [SERVICE_UUID]
-            });
-
+            const device = await navigator.bluetooth.requestDevice({ filters: [{ name: 'AstraCare' }], optionalServices: [SERVICE_UUID] });
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService(SERVICE_UUID);
-            
-            // Get characteristics
             commandChar = await service.getCharacteristic(COMMAND_UUID);
             const dataChar = await service.getCharacteristic(DATA_UUID);
 
-            // Update UI
-            document.getElementById('status-text').innerText = "Connected";
-            document.getElementById('status-dot').style.backgroundColor = "var(--success)";
-            document.getElementById('connectBtn').style.display = "none";
+            document.getElementById('conn-card').style.display = "none";
             document.getElementById('dashboard-ui').style.display = "block";
 
-            // Start JSON notifications (Just like your StressWatch project!)
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', (event) => {
-                const value = event.target.value;
                 const decoder = new TextDecoder('utf-8');
-                const jsonString = decoder.decode(value);
-                
-                try {
-                    const data = JSON.parse(jsonString);
-                    updateDashboard(data);
-                } catch (e) {
-                    console.error("JSON Parse Error: ", e);
-                }
+                const data = JSON.parse(decoder.decode(event.target.value));
+                updateDashboard(data);
             });
-
-        } catch (error) {
-            console.error(error);
-            document.getElementById('status-text').innerText = "Pairing Failed";
-        }
+        } catch (e) { console.error(e); }
     });
 
-    // Handle incoming JSON data
     function updateDashboard(data) {
-        // data.u = used doses, data.e = extra puffs, data.h = history array
-        const remaining = 200 - data.u;
-        document.getElementById('inv-val').innerText = `${remaining} / 200`;
-        document.getElementById('mcg-val').innerText = `${remaining * 100} mcg available`;
-        document.getElementById('extra-val').innerText = data.e;
+        // Inventory
+        document.getElementById('inv-val').innerText = `${200 - data.u} / 200`;
+        
+        // Show Unplanned Puffs if greater than 0
+        if(data.e > 0) {
+            document.getElementById('alert-section').style.display = "block";
+            document.getElementById('extra-val').innerText = data.e;
+        } else {
+            document.getElementById('alert-section').style.display = "none";
+        }
 
-        // Calculate Weekly Average from the history array (first 7 items)
-        const weeklySum = data.h.slice(0, 7).reduce((a, b) => a + b, 0);
-        document.getElementById('week-avg').innerText = Math.round(weeklySum / 7) + " mcg";
+        // Schedule
+        const list = document.getElementById('schedule-list');
+        list.innerHTML = "";
+        data.s.forEach((min, index) => {
+            let h = Math.floor(min / 60);
+            let m = min % 60;
+            let timeStr = (h<10?'0':'') + h + ":" + (m<10?'0':'') + m;
+            list.innerHTML += `<div class="schedule-row"><span>${timeStr}</span><span onclick="delDose(${index})" style="color:var(--danger); cursor:pointer; font-weight:bold;">Remove</span></div>`;
+        });
+        if(data.s.length === 0) list.innerHTML = "<p style='color:var(--text-dim)'>No timers active.</p>";
 
         updateChart(data.h);
     }
 
-    // Render Chart.js
+    async function delDose(index) {
+        if(confirm("Remove this dose time?")) {
+            await commandChar.writeValue(new TextEncoder().encode("DEL:" + index));
+        }
+    }
+
     function updateChart(historyArray) {
         const ctx = document.getElementById('monthChart').getContext('2d');
         if (chart) chart.destroy();
@@ -132,40 +124,21 @@
             type: 'line',
             data: {
                 labels: Array.from({ length: 30 }, (_, i) => 30 - i),
-                datasets: [{ 
-                    label: 'mcg consumed', 
-                    data: historyArray.reverse(), 
-                    borderColor: '#38bdf8', 
-                    backgroundColor: 'rgba(56, 189, 248, 0.1)', 
-                    fill: true, 
-                    tension: 0.4 
-                }]
+                datasets: [{ label: 'mcg', data: historyArray.reverse(), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', fill: true, tension: 0.4 }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' } }, x: { ticks: { display: false }, grid: { display: false } } } }
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid:{color:'#334155'} } } }
         });
     }
 
-    // Send new Timer to ESP32
     document.getElementById('saveTimerBtn').addEventListener('click', async () => {
-        const timeVal = document.getElementById('timeInput').value;
-        if (!timeVal) return alert("Select a time first");
-        
-        const [h, m] = timeVal.split(':').map(Number);
-        const totalMinutes = (h * 60 + m).toString();
-        
-        // Write the total minutes string to the command characteristic
-        await commandChar.writeValue(new TextEncoder().encode(totalMinutes));
-        alert("Timer Synced to Inhaler!");
+        const [h, m] = document.getElementById('timeInput').value.split(':').map(Number);
+        await commandChar.writeValue(new TextEncoder().encode((h * 60 + m).toString()));
+        alert("Schedule Updated!");
     });
 
-    // Send Master Reset Command to ESP32
     document.getElementById('resetBtn').addEventListener('click', async () => {
-        if(confirm("Are you sure you want to delete all medical history?")) {
-            await commandChar.writeValue(new TextEncoder().encode("9999"));
-            alert("Device Reset.");
-        }
+        if(confirm("Reset all medical history and inventory?")) await commandChar.writeValue(new TextEncoder().encode("9999"));
     });
 </script>
-
 </body>
 </html>
